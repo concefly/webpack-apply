@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "module": "commonJs",
+    "target": "es6",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "allowUnusedLabels": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "lib": [
+      "es2017"
+    ],
+  }
+}
