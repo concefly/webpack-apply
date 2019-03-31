@@ -141,7 +141,7 @@ export const applyScript = (opt: {
             loaderUse.babel,
             loaderUse.ts({ happyPackMode: true }),
           ],
-        }
+        },
       ],
     },
 
@@ -221,11 +221,13 @@ export const applyImage = () => (config: webpack.Configuration) => {
 };
 
 /** 生成 Manifest */
-export const applyManifest = (opt: { publicPath: string }) => (config: webpack.Configuration) => {
-  const { publicPath } = opt;
+export const applyManifest = (opt: { publicPath: string; fileName: string }) => (
+  config: webpack.Configuration
+) => {
+  const { publicPath, fileName } = opt;
 
   return merge(config, {
-    plugins: [new ManifestPlugin({ publicPath })],
+    plugins: [new ManifestPlugin({ publicPath, fileName })],
   });
 };
 
@@ -285,33 +287,50 @@ export const applyDevServer = (opt: { port: number; https: boolean }) => (
   return newConfig;
 };
 
-export const applyCommon = (opt: {
+export interface ICommonOpt {
   entry: { [name: string]: string };
-  assetsTsConfigPath: string;
-  mode: 'development' | 'production';
-  enableCache: boolean;
-  hotReload: boolean;
-  publicPath: string;
-  env: string;
-  define: any;
-  /** 指定 manifest 输出路径 */
-  manifestPath?: string;
+  outputPath?: string;
+  assetsTsConfigPath?: string;
+  mode?: 'development' | 'production';
+  enableCache?: boolean;
+  hotReload?: boolean;
+  publicPath?: string;
+  env?: string;
+  define?: any;
   templateDir?: string;
+  manifestFileName?: string;
   devServer?: {
     https: boolean;
     port: number;
   };
-}) => (config: webpack.Configuration): webpack.Configuration => {
-  const defaultConfig = {
-    entry: opt.entry,
+}
+
+export const applyCommon = ({
+  entry,
+  outputPath = join(CWD, 'dist'),
+  assetsTsConfigPath = join(CWD, 'tsconfig.json'),
+  mode = 'production',
+  enableCache = true,
+  hotReload = true,
+  publicPath = '/',
+  env = 'production',
+  define = {},
+  templateDir,
+  manifestFileName = 'manifest.json',
+  devServer,
+}: ICommonOpt) => (config: webpack.Configuration): webpack.Configuration => {
+  const defaultConfig: webpack.Configuration = {
+    entry,
 
     output: {
-      ...config.output,
-      publicPath: opt.publicPath,
+      path: outputPath,
+      filename: mode === 'development' ? '[name].js' : '[name].[hash].js',
+      hashDigestLength: 12,
+      publicPath,
     },
 
-    mode: opt.mode,
-    devtool: opt.mode === 'development' ? 'cheap-module-source-map' : 'nosources-source-map',
+    mode,
+    devtool: mode === 'development' ? 'cheap-module-source-map' : 'nosources-source-map',
 
     plugins: [
       // 显示打包进度条
@@ -320,9 +339,9 @@ export const applyCommon = (opt: {
       }),
 
       new webpack.DefinePlugin({
-        ENV: JSON.stringify(opt.env),
-        PUBLIC_PATH: JSON.stringify(opt.publicPath),
-        ...opt.define,
+        ENV: JSON.stringify(env),
+        PUBLIC_PATH: JSON.stringify(publicPath),
+        ...define,
       }),
 
       // 路径检查大小写
@@ -331,34 +350,35 @@ export const applyCommon = (opt: {
   };
 
   return _.flowRight([
-    ...(opt.devServer
+    ...(devServer
       ? [
           applyDevServer({
-            port: opt.devServer.port,
-            https: opt.devServer.https,
+            port: devServer.port,
+            https: devServer.https,
           }),
         ]
       : []),
-    ...(opt.templateDir
+    ...(templateDir
       ? [
           applyTemplate({
             params: {
-              ENV: opt.env,
+              ENV: env,
             },
-            tplDir: opt.templateDir,
-            entryNames: _.keys(opt.entry),
+            tplDir: templateDir,
+            entryNames: _.keys(entry),
           }),
         ]
       : []),
     applyManifest({
-      publicPath: opt.manifestPath || opt.publicPath,
+      publicPath,
+      fileName: manifestFileName,
     }),
     applyImage(),
     applyStyle({ theme: {} }),
     applyScript({
-      enableCache: opt.enableCache,
-      hotReload: opt.hotReload,
-      assetsTsConfigPath: opt.assetsTsConfigPath,
+      enableCache,
+      hotReload,
+      assetsTsConfigPath,
       cacheIdentifier: [],
     }),
     c => merge(c, defaultConfig as any),
