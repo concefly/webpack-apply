@@ -11,7 +11,6 @@ describe.skip('applyCommon', () => {
       assetsTsConfigPath: `${CWD}/test/mock-tsconfig.json`,
       mode: 'development',
       enableCache: true,
-      inlineSourceMap: true,
       hotReload: true,
       publicPath: 'publicPath',
       env: 'ent',

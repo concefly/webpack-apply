@@ -13,7 +13,7 @@ import CaseSensitivePathsPlugin from 'case-sensitive-paths-webpack-plugin';
 import ProgressBarPlugin from 'progress-bar-webpack-plugin';
 import merge from 'webpack-merge';
 
-export const CWD = process.cwd();
+const CWD = process.cwd();
 
 /** 计算一组文件的 hash */
 export function getFilesHash(filePaths: string[]) {
@@ -26,17 +26,17 @@ export const applyStyle = (opt: { theme: { [name: string]: string } }) => (
 ) => {
   const loaderUse = {
     less: {
-      loader: 'less-loader',
+      loader: require.resolve('less-loader'),
       options: {
         javascriptEnabled: true,
         modifyVars: opt.theme,
       },
     },
     style: {
-      loader: 'style-loader',
+      loader: require.resolve('style-loader'),
     },
     css: ({ modules }) => ({
-      loader: 'css-loader',
+      loader: require.resolve('css-loader'),
       options: { modules },
     }),
   };
@@ -74,7 +74,7 @@ export const applyScript = (opt: {
 
   const loaderUse = {
     cache: {
-      loader: 'cache-loader',
+      loader: require.resolve('cache-loader'),
       options: {
         cacheDirectory: join(CWD, 'node_modules', '.cache-loader'),
         cacheIdentifier,
@@ -82,7 +82,7 @@ export const applyScript = (opt: {
     },
 
     thread: {
-      loader: 'thread-loader',
+      loader: require.resolve('thread-loader'),
       options: {
         // 留 1 个 CPU 给 fork-ts-checker-webpack-plugin
         workers: cpus().length - 1,
@@ -90,24 +90,24 @@ export const applyScript = (opt: {
     },
 
     worker: {
-      loader: 'worker-loader',
+      loader: require.resolve('worker-loader'),
       options: { inline: true },
     },
 
     // babel -> 增强 es5
     babel: {
-      loader: 'babel-loader',
+      loader: require.resolve('babel-loader'),
       options: {
         // 缓存地址 ./node_modules/.cache/babel-loader
         cacheDirectory: opt.enableCache,
         cacheIdentifier,
         babelrc: false,
         plugins: [
-          ...(opt.hotReload ? ['react-hot-loader/babel'] : []),
-          '@babel/plugin-syntax-dynamic-import',
-          ['import', { libraryName: 'antd', libraryDirectory: 'es' }],
+          ...(opt.hotReload ? [require.resolve('react-hot-loader/babel')] : []),
+          require.resolve('@babel/plugin-syntax-dynamic-import'),
+          [require.resolve('babel-plugin-import'), { libraryName: 'antd', libraryDirectory: 'es' }],
           [
-            'import',
+            require.resolve('babel-plugin-import'),
             { libraryName: 'lodash', libraryDirectory: '', camel2DashComponentName: false },
             'import-lodash',
           ],
@@ -117,7 +117,7 @@ export const applyScript = (opt: {
 
     // tsc -> 编译 typescript 到 es5
     ts: ({ happyPackMode }) => ({
-      loader: 'ts-loader',
+      loader: require.resolve('ts-loader'),
       options: {
         configFile: opt.assetsTsConfigPath,
         transpileOnly: true,
@@ -135,26 +135,13 @@ export const applyScript = (opt: {
         // 普通 tsx 的 loader
         {
           test: /\.tsx?$/,
-          include: join(CWD, 'src'),
-          exclude: /\.worker\.ts$/,
           use: [
             loaderUse.thread,
             ...(opt.enableCache ? [loaderUse.cache] : []),
             loaderUse.babel,
             loaderUse.ts({ happyPackMode: true }),
           ],
-        },
-        // worker 的 loader
-        {
-          test: /\.worker\.ts$/,
-          include: join(CWD, 'src'),
-          use: [
-            ...(opt.enableCache ? [loaderUse.cache] : []),
-            loaderUse.worker,
-            loaderUse.babel,
-            loaderUse.ts({ happyPackMode: false }),
-          ],
-        },
+        }
       ],
     },
 
@@ -224,7 +211,7 @@ export const applyImage = () => (config: webpack.Configuration) => {
           test: /\.svg(\?v=\d+\.\d+\.\d+)?$/,
           use: [
             {
-              loader: '@svgr/webpack',
+              loader: require.resolve('@svgr/webpack'),
             },
           ],
         },
@@ -254,7 +241,7 @@ export const applyTemplate = (opt: {
       rules: [
         {
           test: /\.ejs$/,
-          loader: 'ejs-compiled-loader',
+          loader: require.resolve('ejs-compiled-loader'),
         },
       ],
     },
@@ -303,12 +290,13 @@ export const applyCommon = (opt: {
   assetsTsConfigPath: string;
   mode: 'development' | 'production';
   enableCache: boolean;
-  inlineSourceMap: boolean;
   hotReload: boolean;
   publicPath: string;
   env: string;
   define: any;
-  templateDir: string;
+  /** 指定 manifest 输出路径 */
+  manifestPath?: string;
+  templateDir?: string;
   devServer?: {
     https: boolean;
     port: number;
@@ -323,7 +311,7 @@ export const applyCommon = (opt: {
     },
 
     mode: opt.mode,
-    devtool: opt.inlineSourceMap ? 'inline-cheap-module-source-map' : 'cheap-source-map',
+    devtool: opt.mode === 'development' ? 'cheap-module-source-map' : 'nosources-source-map',
 
     plugins: [
       // 显示打包进度条
@@ -343,19 +331,27 @@ export const applyCommon = (opt: {
   };
 
   return _.flowRight([
-    applyDevServer({
-      port: opt.devServer.port,
-      https: opt.devServer.https,
-    }),
-    applyTemplate({
-      params: {
-        ENV: opt.env,
-      },
-      tplDir: opt.templateDir,
-      entryNames: _.keys(opt.entry),
-    }),
+    ...(opt.devServer
+      ? [
+          applyDevServer({
+            port: opt.devServer.port,
+            https: opt.devServer.https,
+          }),
+        ]
+      : []),
+    ...(opt.templateDir
+      ? [
+          applyTemplate({
+            params: {
+              ENV: opt.env,
+            },
+            tplDir: opt.templateDir,
+            entryNames: _.keys(opt.entry),
+          }),
+        ]
+      : []),
     applyManifest({
-      publicPath: opt.publicPath,
+      publicPath: opt.manifestPath || opt.publicPath,
     }),
     applyImage(),
     applyStyle({ theme: {} }),
