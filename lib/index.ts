@@ -108,6 +108,11 @@ export const applyScript = (opt: {
           [require.resolve('babel-plugin-import'), { libraryName: 'antd', libraryDirectory: 'es' }],
           [
             require.resolve('babel-plugin-import'),
+            { libraryName: 'antd-mobile', libraryDirectory: 'lib', style: true },
+            'import-antd-mobile',
+          ],
+          [
+            require.resolve('babel-plugin-import'),
             { libraryName: 'lodash', libraryDirectory: '', camel2DashComponentName: false },
             'import-lodash',
           ],
